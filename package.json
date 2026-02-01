@@ -1,0 +1,32 @@
+{
+  "name": "data-roi-calculator",
+  "version": "1.0.0",
+  "description": "A comprehensive Data ROI Calculator for justifying data investments with industry-specific insights",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 3000",
+    "build": "echo 'No build step required for static app'",
+    "start": "python -m http.server 3000"
+  },
+  "keywords": [
+    "roi",
+    "calculator",
+    "data",
+    "analytics",
+    "business",
+    "investment",
+    "finance"
+  ],
+  "author": "Foundry AI",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "chart.js": "^4.0.0",
+    "jspdf": "^2.5.1"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

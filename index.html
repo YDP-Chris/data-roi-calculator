@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data ROI Calculator</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        .input-focus:focus {
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        @media print {
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Industry multipliers and benchmarks
+        const INDUSTRY_DATA = {
+            'technology': {
+                name: 'Technology',
+                multipliers: { cost: 1.4, revenue: 1.6, time: 1.3, risk: 1.5, efficiency: 1.4 },
+                benchmarks: { avgProjectCost: 250000, avgRevenue: 5000000 }
+            },
+            'finance': {
+                name: 'Financial Services',
+                multipliers: { cost: 1.6, revenue: 1.4, time: 1.2, risk: 1.8, efficiency: 1.3 },
+                benchmarks: { avgProjectCost: 400000, avgRevenue: 10000000 }
+            },
+            'healthcare': {
+                name: 'Healthcare',
+                multipliers: { cost: 1.2, revenue: 1.3, time: 1.4, risk: 2.0, efficiency: 1.5 },
+                benchmarks: { avgProjectCost: 300000, avgRevenue: 3000000 }
+            },
+            'retail': {
+                name: 'Retail & E-commerce',
+                multipliers: { cost: 1.3, revenue: 1.5, time: 1.2, risk: 1.2, efficiency: 1.3 },
+                benchmarks: { avgProjectCost: 180000, avgRevenue: 8000000 }
+            },
+            'manufacturing': {
+                name: 'Manufacturing',
+                multipliers: { cost: 1.5, revenue: 1.2, time: 1.5, risk: 1.4, efficiency: 1.6 },
+                benchmarks: { avgProjectCost: 350000, avgRevenue: 15000000 }
+            },
+            'other': {
+                name: 'Other',
+                multipliers: { cost: 1.0, revenue: 1.0, time: 1.0, risk: 1.0, efficiency: 1.0 },
+                benchmarks: { avgProjectCost: 200000, avgRevenue: 4000000 }
+            }
+        };
+
+        const COMPANY_SIZES = {
+            'startup': { name: 'Startup (1-50 employees)', multiplier: 0.7, baseSpend: 50000 },
+            'small': { name: 'Small Business (51-200 employees)', multiplier: 1.0, baseSpend: 150000 },
+            'medium': { name: 'Medium Business (201-1000 employees)', multiplier: 1.3, baseSpend: 400000 },
+            'large': { name: 'Large Enterprise (1000+ employees)', multiplier: 1.8, baseSpend: 800000 }
+        };
+
+        const DataROICalculator = () => {
+            const [formData, setFormData] = useState({
+                companyName: '',
+                industry: 'technology',
+                companySize: 'small',
+                projectBudget: 200000,
+                timeframe: 12,
+                currentCosts: 100000,
+                targetRevenue: 500000,
+                hoursPerWeek: 40,
+                riskReduction: 30,
+                processEfficiency: 25
+            });
+
+            const [results, setResults] = useState(null);
+            const [showResults, setShowResults] = useState(false);
+            const chartRef = useRef(null);
+
+            const handleInputChange = (field, value) => {
+                // Handle numeric inputs with validation
+                if (typeof value === 'string' && ['projectBudget', 'timeframe', 'currentCosts', 'targetRevenue', 'hoursPerWeek', 'riskReduction', 'processEfficiency'].includes(field)) {
+                    const numValue = parseFloat(value);
+                    value = isNaN(numValue) ? 0 : numValue;
+                }
+                setFormData(prev => ({ ...prev, [field]: value }));
+            };
+
+            const calculateROI = () => {
+                const industry = INDUSTRY_DATA[formData.industry];
+                const companySize = COMPANY_SIZES[formData.companySize];
+
+                // Base calculations with validation
+                const projectCost = Math.max(0, parseFloat(formData.projectBudget) || 0);
+                const timeframeMonths = Math.max(1, parseFloat(formData.timeframe) || 12);
+
+                // Prevent division by zero
+                if (projectCost === 0) {
+                    return {
+                        costROI: 0, revenueROI: 0, timeROI: 0, riskROI: 0, efficiencyROI: 0,
+                        overallROI: 0, paybackPeriod: 0, totalBenefits: 0,
+                        annualCostSavings: 0, additionalRevenue: 0, timeSavingsValue: 0,
+                        riskValue: 0, efficiencyValue: 0
+                    };
+                }
+
+                // Cost Reduction ROI
+                const currentCosts = Math.max(0, parseFloat(formData.currentCosts) || 0);
+                const costReductionRate = 0.15 * industry.multipliers.cost * companySize.multiplier;
+                const annualCostSavings = currentCosts * costReductionRate;
+                const costROI = (annualCostSavings * (timeframeMonths / 12) - projectCost) / projectCost * 100;
+
+                // Revenue Increase ROI
+                const targetRevenue = Math.max(0, parseFloat(formData.targetRevenue) || 0);
+                const revenueGrowthRate = 0.12 * industry.multipliers.revenue * companySize.multiplier;
+                const additionalRevenue = targetRevenue * revenueGrowthRate;
+                const revenueROI = (additionalRevenue * (timeframeMonths / 12) - projectCost) / projectCost * 100;
+
+                // Time Savings ROI
+                const hoursPerWeek = Math.max(0, Math.min(168, parseFloat(formData.hoursPerWeek) || 0));
+                const timeSavingsRate = 0.20 * industry.multipliers.time;
+                const hoursSaved = hoursPerWeek * timeSavingsRate * 52 * (timeframeMonths / 12);
+                const averageHourlyRate = 75 * companySize.multiplier;
+                const timeSavingsValue = hoursSaved * averageHourlyRate;
+                const timeROI = (timeSavingsValue - projectCost) / projectCost * 100;
+
+                // Risk Reduction ROI
+                const riskReduction = Math.max(0, Math.min(100, parseFloat(formData.riskReduction) || 0));
+                const riskValue = (industry.benchmarks.avgRevenue * 0.05) * (riskReduction / 100) * industry.multipliers.risk;
+                const riskROI = (riskValue * (timeframeMonths / 12) - projectCost) / projectCost * 100;
+
+                // Process Efficiency ROI
+                const processEfficiency = Math.max(0, Math.min(100, parseFloat(formData.processEfficiency) || 0));
+                const efficiencyValue = currentCosts * (processEfficiency / 100) * industry.multipliers.efficiency;
+                const efficiencyROI = (efficiencyValue * (timeframeMonths / 12) - projectCost) / projectCost * 100;
+
+                // Overall ROI
+                const totalBenefits = annualCostSavings + additionalRevenue + timeSavingsValue + riskValue + efficiencyValue;
+                const overallROI = (totalBenefits * (timeframeMonths / 12) - projectCost) / projectCost * 100;
+
+                // Payback period
+                const monthlyBenefits = totalBenefits / 12;
+                const paybackPeriod = monthlyBenefits > 0 ? projectCost / monthlyBenefits : 999;
+
+                return {
+                    costROI: Math.round(costROI),
+                    revenueROI: Math.round(revenueROI),
+                    timeROI: Math.round(timeROI),
+                    riskROI: Math.round(riskROI),
+                    efficiencyROI: Math.round(efficiencyROI),
+                    overallROI: Math.round(overallROI),
+                    paybackPeriod: Math.round(paybackPeriod * 10) / 10,
+                    totalBenefits: Math.round(totalBenefits),
+                    annualCostSavings: Math.round(annualCostSavings),
+                    additionalRevenue: Math.round(additionalRevenue),
+                    timeSavingsValue: Math.round(timeSavingsValue),
+                    riskValue: Math.round(riskValue),
+                    efficiencyValue: Math.round(efficiencyValue)
+                };
+            };
+
+            const handleCalculate = () => {
+                const calculatedResults = calculateROI();
+                setResults(calculatedResults);
+                setShowResults(true);
+            };
+
+            const createChart = () => {
+                if (!chartRef.current || !results) return;
+
+                const ctx = chartRef.current.getContext('2d');
+
+                // Destroy existing chart if it exists
+                if (window.myChart) {
+                    window.myChart.destroy();
+                }
+
+                window.myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Cost Reduction', 'Revenue Increase', 'Time Savings', 'Risk Reduction', 'Process Efficiency'],
+                        datasets: [{
+                            label: 'ROI %',
+                            data: [results.costROI, results.revenueROI, results.timeROI, results.riskROI, results.efficiencyROI],
+                            backgroundColor: [
+                                'rgba(34, 197, 94, 0.8)',
+                                'rgba(59, 130, 246, 0.8)',
+                                'rgba(168, 85, 247, 0.8)',
+                                'rgba(245, 158, 11, 0.8)',
+                                'rgba(239, 68, 68, 0.8)'
+                            ],
+                            borderColor: [
+                                'rgb(34, 197, 94)',
+                                'rgb(59, 130, 246)',
+                                'rgb(168, 85, 247)',
+                                'rgb(245, 158, 11)',
+                                'rgb(239, 68, 68)'
+                            ],
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'ROI by Category (%)',
+                                font: {
+                                    size: 16,
+                                    weight: 'bold'
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            useEffect(() => {
+                if (showResults && results) {
+                    setTimeout(createChart, 100);
+                }
+            }, [showResults, results]);
+
+            const exportToPDF = () => {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                // Header
+                doc.setFontSize(20);
+                doc.setTextColor(102, 126, 234);
+                doc.text('Data ROI Analysis Report', 20, 30);
+
+                // Company info
+                doc.setFontSize(12);
+                doc.setTextColor(0, 0, 0);
+                doc.text(`Company: ${formData.companyName || 'N/A'}`, 20, 50);
+                doc.text(`Industry: ${INDUSTRY_DATA[formData.industry].name}`, 20, 60);
+                doc.text(`Company Size: ${COMPANY_SIZES[formData.companySize].name}`, 20, 70);
+                doc.text(`Project Budget: $${formData.projectBudget.toLocaleString()}`, 20, 80);
+                doc.text(`Timeframe: ${formData.timeframe} months`, 20, 90);
+
+                // Results
+                doc.setFontSize(14);
+                doc.setTextColor(102, 126, 234);
+                doc.text('ROI Analysis Results', 20, 110);
+
+                doc.setFontSize(11);
+                doc.setTextColor(0, 0, 0);
+                const resultLines = [
+                    `Overall ROI: ${results.overallROI}%`,
+                    `Payback Period: ${results.paybackPeriod} months`,
+                    `Total Annual Benefits: $${results.totalBenefits.toLocaleString()}`,
+                    '',
+                    'ROI by Category:',
+                    `  • Cost Reduction: ${results.costROI}% ($${results.annualCostSavings.toLocaleString()})`,
+                    `  • Revenue Increase: ${results.revenueROI}% ($${results.additionalRevenue.toLocaleString()})`,
+                    `  • Time Savings: ${results.timeROI}% ($${results.timeSavingsValue.toLocaleString()})`,
+                    `  • Risk Reduction: ${results.riskROI}% ($${results.riskValue.toLocaleString()})`,
+                    `  • Process Efficiency: ${results.efficiencyROI}% ($${results.efficiencyValue.toLocaleString()})`
+                ];
+
+                let yPos = 120;
+                resultLines.forEach(line => {
+                    doc.text(line, 20, yPos);
+                    yPos += 10;
+                });
+
+                // Footer
+                doc.setFontSize(8);
+                doc.setTextColor(128, 128, 128);
+                doc.text('Generated by Data ROI Calculator', 20, 280);
+                doc.text(new Date().toLocaleDateString(), 150, 280);
+
+                doc.save(`data-roi-analysis-${formData.companyName || 'report'}.pdf`);
+            };
+
+            const formatCurrency = (value) => {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(value);
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <div className="gradient-bg text-white py-12">
+                        <div className="container mx-auto px-4">
+                            <h1 className="text-4xl md:text-5xl font-bold text-center mb-4">
+                                Data ROI Calculator
+                            </h1>
+                            <p className="text-xl text-center text-blue-100 max-w-2xl mx-auto">
+                                Calculate the return on investment for your data initiatives with industry-specific insights
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="container mx-auto px-4 py-8 max-w-6xl">
+                        <div className="grid lg:grid-cols-2 gap-8">
+                            {/* Input Form */}
+                            <div className="bg-white rounded-lg card-shadow p-6">
+                                <h2 className="text-2xl font-bold text-gray-800 mb-6">Project Details</h2>
+
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Company Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={formData.companyName}
+                                            onChange={(e) => handleInputChange('companyName', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            placeholder="Enter company name"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Industry
+                                        </label>
+                                        <select
+                                            value={formData.industry}
+                                            onChange={(e) => handleInputChange('industry', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                        >
+                                            {Object.entries(INDUSTRY_DATA).map(([key, data]) => (
+                                                <option key={key} value={key}>{data.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Company Size
+                                        </label>
+                                        <select
+                                            value={formData.companySize}
+                                            onChange={(e) => handleInputChange('companySize', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                        >
+                                            {Object.entries(COMPANY_SIZES).map(([key, data]) => (
+                                                <option key={key} value={key}>{data.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Project Budget ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.projectBudget}
+                                            onChange={(e) => handleInputChange('projectBudget', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            step="1000"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Analysis Timeframe (months)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.timeframe}
+                                            onChange={(e) => handleInputChange('timeframe', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="1"
+                                            max="60"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Current Annual Operating Costs ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.currentCosts}
+                                            onChange={(e) => handleInputChange('currentCosts', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            step="1000"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Target Revenue Impact ($)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.targetRevenue}
+                                            onChange={(e) => handleInputChange('targetRevenue', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            step="1000"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Hours Per Week on Data Tasks
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.hoursPerWeek}
+                                            onChange={(e) => handleInputChange('hoursPerWeek', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            max="168"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Expected Risk Reduction (%)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.riskReduction}
+                                            onChange={(e) => handleInputChange('riskReduction', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            max="100"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Process Efficiency Gain (%)
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={formData.processEfficiency}
+                                            onChange={(e) => handleInputChange('processEfficiency', e.target.value)}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md input-focus"
+                                            min="0"
+                                            max="100"
+                                        />
+                                    </div>
+
+                                    <button
+                                        onClick={handleCalculate}
+                                        className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 transition-colors font-medium"
+                                    >
+                                        Calculate ROI
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Results */}
+                            {showResults && results && (
+                                <div className="bg-white rounded-lg card-shadow p-6">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold text-gray-800">ROI Analysis</h2>
+                                        <button
+                                            onClick={exportToPDF}
+                                            className="no-print bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm"
+                                        >
+                                            Export PDF
+                                        </button>
+                                    </div>
+
+                                    {/* Key Metrics */}
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
+                                            <div className="text-sm text-green-600 font-medium">Overall ROI</div>
+                                            <div className="text-2xl font-bold text-green-700">{results.overallROI}%</div>
+                                        </div>
+                                        <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
+                                            <div className="text-sm text-blue-600 font-medium">Payback Period</div>
+                                            <div className="text-2xl font-bold text-blue-700">{results.paybackPeriod} months</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Chart */}
+                                    <div className="mb-6">
+                                        <canvas ref={chartRef} width="400" height="200"></canvas>
+                                    </div>
+
+                                    {/* Detailed Breakdown */}
+                                    <div className="space-y-3">
+                                        <h3 className="text-lg font-semibold text-gray-800">Detailed Breakdown</h3>
+
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between items-center py-2 border-b">
+                                                <span className="text-gray-600">Cost Reduction</span>
+                                                <span className="font-semibold">{results.costROI}% ({formatCurrency(results.annualCostSavings)})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b">
+                                                <span className="text-gray-600">Revenue Increase</span>
+                                                <span className="font-semibold">{results.revenueROI}% ({formatCurrency(results.additionalRevenue)})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b">
+                                                <span className="text-gray-600">Time Savings</span>
+                                                <span className="font-semibold">{results.timeROI}% ({formatCurrency(results.timeSavingsValue)})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b">
+                                                <span className="text-gray-600">Risk Reduction</span>
+                                                <span className="font-semibold">{results.riskROI}% ({formatCurrency(results.riskValue)})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b">
+                                                <span className="text-gray-600">Process Efficiency</span>
+                                                <span className="font-semibold">{results.efficiencyROI}% ({formatCurrency(results.efficiencyValue)})</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 font-bold text-lg border-t-2 pt-3">
+                                                <span>Total Annual Benefits</span>
+                                                <span className="text-green-600">{formatCurrency(results.totalBenefits)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Information Section */}
+                        <div className="mt-12 bg-white rounded-lg card-shadow p-6">
+                            <h3 className="text-xl font-bold text-gray-800 mb-4">How It Works</h3>
+                            <div className="grid md:grid-cols-2 gap-6">
+                                <div>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Industry-Specific Calculations</h4>
+                                    <p className="text-gray-600 text-sm">
+                                        Our calculator uses industry-specific multipliers based on real-world data from technology, finance, healthcare, retail, manufacturing, and other sectors.
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Company Size Adjustments</h4>
+                                    <p className="text-gray-600 text-sm">
+                                        ROI calculations are adjusted based on company size, from startups to large enterprises, reflecting different operational scales and capabilities.
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Five ROI Metrics</h4>
+                                    <p className="text-gray-600 text-sm">
+                                        We analyze cost reduction, revenue increase, time savings, risk mitigation, and process efficiency to provide a comprehensive ROI picture.
+                                    </p>
+                                </div>
+                                <div>
+                                    <h4 className="font-semibold text-gray-700 mb-2">Professional Reporting</h4>
+                                    <p className="text-gray-600 text-sm">
+                                        Export detailed PDF reports suitable for executive presentations and investment justification meetings.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<DataROICalculator />, document.getElementById('root'));
+    </script>
+</body>
+</html>
